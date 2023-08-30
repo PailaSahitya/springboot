@@ -1,21 +1,33 @@
-# Use a base image with Java and Maven installed
-FROM maven:3.8.4-openjdk-11-slim AS build
+FROM gradle:7.6.2-jdk17-alpine AS build
 
-# Set the working directory
-WORKDIR /app
+COPY --chown=gradle:gradle . /home/gradle/src
 
-# Copy the pom.xml and source code to the container
-COPY pom.xml .
-COPY src ./src
+WORKDIR /home/gradle/src
 
-# Build the application
-RUN mvn clean install -DskipTests
+RUN gradle build --no-daemon
 
-# Create a new image with a JRE and the built JAR
-FROM openjdk:11-jre-slim
-WORKDIR /app
-COPY --from=build /app/target/your-app.jar app.jar
+ 
 
-# Run the application
-CMD ["java", "-jar", "app.jar"]
+FROM openjdk:17-jdk-slim
 
+ 
+
+EXPOSE 8080
+
+ 
+
+RUN mkdir /app
+
+ 
+
+ 
+
+COPY --from=build /home/gradle/src/build/libs/*.jar /app/spring-boot-application.jar
+
+ 
+
+ 
+
+ 
+
+ENTRYPOINT ["java", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCGroupMemoryLimitForHeap", "-Djava.security.egd=file:/dev/./urandom","-jar","/app/spring-boot-application.jar"]
