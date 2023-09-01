@@ -1,0 +1,44 @@
+name: SpringBootAppPipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        java-version: 17
+
+    - name: Build Spring Boot application
+      run: ./mvnw clean install -DskipTests
+
+    - name: Build Docker image
+      run: docker build -t springboot:${{ github.run_number }} .
+
+    - name: Log in to Azure Container Registry
+      run: docker login springbootregistry123.azurecr.io -u ${{ secrets.ACR_USERNAME }} -p ${{ secrets.ACR_PASSWORD }}
+
+    - name: Push Docker image to ACR
+      run: docker push springbootregistry123.azurecr.io/springboot:${{ github.run_number }}
+
+    - name: Code analysis with SonarQube
+      run: sonar-scanner -Dsonar.projectKey=springboot -Dsonar.sources=src -Dsonar.host.url=http://52.247.106.114:9000/ -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+    - name: Vulnerability scan
+      run: docker scan springbootregistry123.azurecr.io/spring1.1.0:121:${{ github.run_number }}
+
+    - name: Deploy to EKS/AKS
+      run: kubectl apply -f main.yaml
+
+    - name: Send email on vulnerabilities
+      if: failure()
+      run: echo "Vulnerabilities found. Please investigate and address." | mail -s "Vulnerabilities in Docker image" sahityapaila333@gmail.com
